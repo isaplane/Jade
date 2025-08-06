@@ -8,34 +8,38 @@
 //          contains_point :: (shape: Shape_Type, x: int, y: int) -> bool;
 //
 // 2. The type of the custom user data stored in each node.
+//
+#module_parameters(
+    SHAPE_TYPE:     Type,
+    DATA_TYPE:      Type,
+    NUMERICAL_TYPE: Type
+);
 
-Numerical_Type :: float;
-
-Node :: struct(Shape_Type: Type, T: Type)
+Node :: struct
 {
-    shape:  Shape_Type;
-    data:   T;
+    shape:  SHAPE_TYPE;
+    data:   DATA_TYPE;
 
-    parent: *Node(Shape_Type, T);
-    left:   *Node(Shape_Type, T);
-    right:  *Node(Shape_Type, T);
+    parent: *Node;
+    left:   *Node;
+    right:  *Node;
 }
 
-Tree :: struct(Shape_Type: Type, T: Type)
+Tree :: struct
 {
-    root:  *Node(Shape_Type, T);
-    procs: Tree_Procs(Shape_Type);
+    root:  *Node;
+    procs: Tree_Procs;
 }
 
-Tree_Procs :: struct(Shape_Type: Type)
+Tree_Procs :: struct
 {
-    contains_point: (Shape_Type, Numerical_Type, Numerical_Type) -> bool;
+    contains_point: (SHAPE_TYPE, NUMERICAL_TYPE, NUMERICAL_TYPE) -> bool;
 }
 
-init_tree :: (root_shape: $Shape_Type, root_data: $T, procs: Tree_Procs) -> *Tree(Shape_Type, T) 
+init_tree :: (root_shape: SHAPE_TYPE, root_data: DATA_TYPE, procs: Tree_Procs) -> *Tree 
 {
-    tree := New(Tree(Shape_Type, T));
-    root := New(Node(Shape_Type, T));
+    tree := New(Tree);
+    root := New(Node);
 
     root.shape = root_shape;
     root.data  = root_data;
@@ -86,7 +90,7 @@ free_tree :: (tree: *Tree)
     free(tree);
 }
 
-bisect_node :: (node: *Node($Shape_Type, $T), left_shape: Shape_Type, left_data: T, right_shape: Shape_Type, right_data: T) -> bool
+bisect_node :: (node: *Node, left_shape: SHAPE_TYPE, left_data: DATA_TYPE, right_shape: SHAPE_TYPE, right_data: DATA_TYPE) -> bool
 {
     if node.left || node.right
     {
@@ -94,12 +98,12 @@ bisect_node :: (node: *Node($Shape_Type, $T), left_shape: Shape_Type, left_data:
         return false;
     }
 
-    left := New(Node(Shape_Type, T));
+    left := New(Node);
     left.shape = left_shape;
     left.data = left_data;
     left.parent = node;
 
-    right := New(Node(Shape_Type, T));
+    right := New(Node);
     right.shape = right_shape;
     right.data = right_data;
     right.parent = node;
@@ -111,7 +115,7 @@ bisect_node :: (node: *Node($Shape_Type, $T), left_shape: Shape_Type, left_data:
 }
 
 // Provide a pointer to a resizeable array to get the full path to the leaf node (starting from root, leaf not included)
-find_leaf_at_point :: (tree: *Tree($Shape_Type, $T), x: Numerical_Type, y: Numerical_Type, path: *[..] *Node(Shape_Type, T) = null) -> *Node(Shape_Type, T)
+find_leaf_at_point :: (tree: *Tree, x: NUMERICAL_TYPE, y: NUMERICAL_TYPE, path: *[..] *Node = null) -> *Node
 {
     if !tree.root
     {

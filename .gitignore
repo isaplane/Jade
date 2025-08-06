@@ -1,2 +1,6 @@
-.build
+*.build
 jails.json
+*build.jai
+*run_tests.jai
+*tests
+*modules/

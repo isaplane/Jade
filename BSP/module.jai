@@ -9,54 +9,43 @@
 //
 // 2. The type of the custom user data stored in each node.
 //
-#module_parameters(
-    SHAPE_TYPE:     Type,
-    DATA_TYPE:      Type,
-    NUMERICAL_TYPE: Type
-);
 
-Node :: struct
+Tree :: struct(Shape_Type: Type, Data_Type: Type)
 {
-    shape:  SHAPE_TYPE;
-    data:   DATA_TYPE;
-
-    parent: *Node;
-    left:   *Node;
-    right:  *Node;
+    root:      *Node(Shape_Type, Data_Type);
+    allocator: Allocator;
 }
 
-Tree :: struct
+Node :: struct(Shape_Type: Type, Data_Type: Type)
 {
-    root:  *Node;
-    procs: Tree_Procs;
+    shape:  Shape_Type;
+    data:   Data_Type;
+
+    parent: *Node(Shape_Type, Data_Type);
+    left:   *Node(Shape_Type, Data_Type);
+    right:  *Node(Shape_Type, Data_Type);
 }
 
-Tree_Procs :: struct
+init_tree :: (root_shape: $Shape_Type, root_data: $Data_Type, allocator := context.allocator) -> *Tree(Shape_Type, Data_Type) 
 {
-    contains_point: (SHAPE_TYPE, NUMERICAL_TYPE, NUMERICAL_TYPE) -> bool;
-}
-
-init_tree :: (root_shape: SHAPE_TYPE, root_data: DATA_TYPE, procs: Tree_Procs) -> *Tree 
-{
-    tree := New(Tree);
-    root := New(Node);
+    tree := New(Tree(Shape_Type, Data_Type),, allocator);
+    root := New(Node(Shape_Type, Data_Type),, allocator);
 
     root.shape = root_shape;
     root.data  = root_data;
 
     tree.root  = root;
-    tree.procs = procs;
-
+    tree.allocator = allocator;
     return tree;
 }
 
-free_node_and_children :: (node: *Node)
+free_node_and_children :: (tree: *Tree, node: *Node)
 {
     if !node return;
 
-    free_node_and_children(node.left);
-    free_node_and_children(node.right);
-    defer free(node);
+    free_node_and_children(tree, node.left);
+    free_node_and_children(tree, node.right);
+    defer free(node,, tree.allocator);
 
     // In case this is the root node.
     if !node.parent return;
@@ -74,7 +63,7 @@ free_all_nodes :: (tree: *Tree)
         return;
     }
 
-    free_node_and_children(tree.root);
+    free_node_and_children(tree, tree.root);
     tree.root = null;
 }
 
@@ -86,11 +75,11 @@ free_tree :: (tree: *Tree)
         return;
     }
 
-    free_node_and_children(tree.root);
-    free(tree);
+    free_node_and_children(tree, tree.root);
+    free(tree,, tree.allocator);
 }
 
-bisect_node :: (node: *Node, left_shape: SHAPE_TYPE, left_data: DATA_TYPE, right_shape: SHAPE_TYPE, right_data: DATA_TYPE) -> bool
+bisect_node :: (tree: *Tree, node: *$N/Node, left_shape: N.Shape_Type, left_data: N.Data_Type, right_shape: N.Shape_Type, right_data: N.Data_Type) -> bool
 {
     if node.left || node.right
     {
@@ -98,12 +87,12 @@ bisect_node :: (node: *Node, left_shape: SHAPE_TYPE, left_data: DATA_TYPE, right
         return false;
     }
 
-    left := New(Node);
+    left := New(N,, tree.allocator);
     left.shape = left_shape;
     left.data = left_data;
     left.parent = node;
 
-    right := New(Node);
+    right := New(N,, tree.allocator);
     right.shape = right_shape;
     right.data = right_data;
     right.parent = node;
@@ -115,29 +104,30 @@ bisect_node :: (node: *Node, left_shape: SHAPE_TYPE, left_data: DATA_TYPE, right
 }
 
 // Provide a pointer to a resizeable array to get the full path to the leaf node (starting from root, leaf not included)
-find_leaf_at_point :: (tree: *Tree, x: NUMERICAL_TYPE, y: NUMERICAL_TYPE, path: *[..] *Node = null) -> *Node
+find_leaf_containing_point :: (using tree: *$T/Tree, x: $V, y: V, 
+                      contains_point_proc: (T.Shape_Type, V, V) -> bool, 
+                      path: *[..] type_of(T.root) = null) -> type_of(T.root)
 {
-    if !tree.root
+    if !root
     {
-        log_error("Bad tree root = null.\n");
+        log_error("Bad root = null.\n");
         return null;
     }
 
-    if !tree.procs.contains_point(tree.root.shape, x, y)
+    if !contains_point_proc(root.shape, x, y)
     {
         log_error("Bad point, not found in root.\n");
         return null;
     }
 
-    curr := tree.root;
-    contains := tree.procs.contains_point;
+    curr := root;
     while curr.left
     {
         if path array_add(path, curr);
 
-        if contains(curr.left.shape, x, y)
+        if contains_point_proc(curr.left.shape, x, y)
             curr = curr.left;
-        else if contains(curr.right.shape, x, y)
+        else if contains_point_proc(curr.right.shape, x, y)
             curr = curr.right;
         else break;
     }

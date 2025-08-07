@@ -1,40 +1,33 @@
 // A generic 2D Binary Space Partition (BSP) Tree module.
 // This module provides a way to represent a 2D space that is recursively subdivided.
 
-// The tree is polymorphic over two types:
-// 1. Shape_Type - the type of primitive used for dividing the space.
-//      This can be a Rect, a convex Polygon, or any other shape struct.
-//      The user of this module MUST provide a 'contains_point' procedure for their Shape_Type:
-//          contains_point :: (shape: Shape_Type, x: int, y: int) -> bool;
-//
-// 2. The type of the custom user data stored in each node.
-//
+// The tree is polymorphic over the type of data stored in each node.
+// This data should, at a minimum, contain some inforation about the partition geometry for that node.
+// It is up to the user to provide a contains_point_proc for testing whether a particular point exists inside a partition node.
 
-Tree :: struct(Shape_Type: Type, Data_Type: Type)
+Tree :: struct(Node_Type: Type)
 {
-    root:      *Node(Shape_Type, Data_Type);
+    root:      *Node_Type;
     allocator: Allocator;
 }
 
-Node :: struct(Shape_Type: Type, Data_Type: Type)
+Node :: struct(Data_Type: Type)
 {
-    shape:  Shape_Type;
     data:   Data_Type;
 
-    parent: *Node(Shape_Type, Data_Type);
-    left:   *Node(Shape_Type, Data_Type);
-    right:  *Node(Shape_Type, Data_Type);
+    parent: *Node(Data_Type);
+    left:   *Node(Data_Type);
+    right:  *Node(Data_Type);
 }
 
-init_tree :: (root_shape: $Shape_Type, root_data: $Data_Type, allocator := context.allocator) -> *Tree(Shape_Type, Data_Type) 
+get_new_tree :: (root_data: $Data_Type, allocator := context.allocator) -> *Tree(Node(Data_Type)) 
 {
-    tree := New(Tree(Shape_Type, Data_Type),, allocator);
-    root := New(Node(Shape_Type, Data_Type),, allocator);
-
-    root.shape = root_shape;
+    T :: Node(Data_Type);
+    root := New(T,, allocator);
     root.data  = root_data;
 
-    tree.root  = root;
+    tree := New(Tree(T),, allocator);
+    tree.root = root;
     tree.allocator = allocator;
     return tree;
 }
@@ -79,7 +72,7 @@ free_tree :: (tree: *Tree)
     free(tree,, tree.allocator);
 }
 
-bisect_node :: (tree: *Tree, node: *$N/Node, left_shape: N.Shape_Type, left_data: N.Data_Type, right_shape: N.Shape_Type, right_data: N.Data_Type) -> bool
+bisect_node :: (tree: *Tree, node: *$N/Node, left_data: N.Data_Type, right_data: N.Data_Type) -> bool
 {
     if node.left || node.right
     {
@@ -88,12 +81,10 @@ bisect_node :: (tree: *Tree, node: *$N/Node, left_shape: N.Shape_Type, left_data
     }
 
     left := New(N,, tree.allocator);
-    left.shape = left_shape;
     left.data = left_data;
     left.parent = node;
 
     right := New(N,, tree.allocator);
-    right.shape = right_shape;
     right.data = right_data;
     right.parent = node;
 
@@ -105,8 +96,8 @@ bisect_node :: (tree: *Tree, node: *$N/Node, left_shape: N.Shape_Type, left_data
 
 // Provide a pointer to a resizeable array to get the full path to the leaf node (starting from root, leaf not included)
 find_leaf_containing_point :: (using tree: *$T/Tree, x: $V, y: V, 
-                      contains_point_proc: (T.Shape_Type, V, V) -> bool, 
-                      path: *[..] type_of(T.root) = null) -> type_of(T.root)
+                      contains_point_proc: (T.Node_Type.Data_Type, V, V) -> bool, 
+                      path: *[..] *T.Node_Type = null) -> *T.Node_Type
 {
     if !root
     {
@@ -114,7 +105,7 @@ find_leaf_containing_point :: (using tree: *$T/Tree, x: $V, y: V,
         return null;
     }
 
-    if !contains_point_proc(root.shape, x, y)
+    if !contains_point_proc(root.data, x, y)
     {
         log_error("Bad point, not found in root.\n");
         return null;
@@ -125,9 +116,9 @@ find_leaf_containing_point :: (using tree: *$T/Tree, x: $V, y: V,
     {
         if path array_add(path, curr);
 
-        if contains_point_proc(curr.left.shape, x, y)
+        if contains_point_proc(curr.left.data, x, y)
             curr = curr.left;
-        else if contains_point_proc(curr.right.shape, x, y)
+        else if contains_point_proc(curr.right.data, x, y)
             curr = curr.right;
         else break;
     }
